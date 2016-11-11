@@ -1,0 +1,127 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+
+if(sysCallNo == 9) then
+	alias arg1 S2;
+	alias i S3;
+	alias base S4;
+	alias exebl S5;
+	alias curbl S6;
+	alias diff S7;
+	alias temp S8;
+	arg1 = [physicalSP - 3];
+	i=0;
+	while(i<64) do
+		if([FAT+i*8]==arg1) then
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(i==64) then
+		print("NOFILE");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	base = [FAT+i*8+2];
+	load(1,base);
+	i=0;
+	exebl=0;
+	curbl=0;
+	while(i<256) do
+		if([SCRATCHPAD+i]!=-1 && [SCRATCHPAD+i]!="") then
+			exebl=exebl+1;
+		endif;
+		i=i+1;
+	endwhile;
+	if(exebl>3) then
+		print("MORECODE");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	i=0;
+	while(i<PTLR-1) do
+		if([PTBR +i*2+1]=="01" || [PTBR+i*2+1]=="11") then
+			curbl=curbl+1;
+		endif;
+		i=i+1; 
+	endwhile;
+	if(curbl>exebl) then
+		diff=curbl-exebl;
+		i=0;
+		while(i<diff) do
+			temp=[PTBR+(diff-i)*2];
+			[MEM_LIST+temp]=0;
+			[PTBR+(diff-i)*2]=-1;
+			[PTBR+(diff-i)*2+1]="00";
+			i=i+1;
+		endwhile;
+	endif;
+	if(curbl<exebl) then
+		diff=exebl-curbl;
+		i=0;
+		while(i<64) do
+			if([MEM_LIST+i]==0) then
+				diff=diff-1;
+			endif;
+			if(diff<=0) then
+				break;
+			endif;
+			i=i+1;
+		endwhile;
+		if(diff>0) then
+			print("NOSPACE");
+			[physicalSP-2]=-1;
+			ireturn;
+		endif;
+		i=0;
+		alias j S8;
+		diff=exebl-curbl;
+		while(i<64) do
+			if([MEM_LIST+i]==0) then
+				curbl=curbl+1;
+				[PTBR+curbl*2]=i;
+				[PTBR+curbl*2+1]="01";
+				[MEM_LIST+i]=1;
+				diff=diff-1;
+			endif;
+			if(diff<=0) then
+				break;
+			endif;
+			i=i+1;
+		endwhile;
+	endif;
+	i=0;
+	while(i<exebl) do
+		print(i);
+		temp=[PTBR+i*2];
+		curbl=[SCRATCHPAD+i];
+		load(temp,curbl);
+		i=i+1;
+	endwhile;
+	i=15;
+	alias ppid S7;
+	alias pPCB S8;
+	alias widentry S9;
+	alias tmp S10;
+	ppid=(PTBR-1024)/8;
+	pPCB=READY_LIST+ppid*32;
+	while(i<30) do
+		if([pPCB+i]!=-1) then
+			widentry=[pPCB+i];
+			tmp=[FILE_TABLE+widentry*2+1];
+			[FILE_TABLE+widentry*2+1]=tmp-1;
+			[pPCB+i]=-1;
+			[pPCB+i]=0;
+			if(tmp==0) then
+				[FILE_TABLE+widentry*2]=-1;
+			endif;
+		endif;
+		i=i+2;
+	endwhile;
+	SP=3*512;
+	tmp=[PTBR+6];
+	[tmp*512]=0;
+	ireturn;
+endif;

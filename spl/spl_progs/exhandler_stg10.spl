@@ -1,0 +1,119 @@
+//print("EXHANDLER");
+alias Cause S0;
+alias VPagenum S1;
+alias Ip_addr S2;
+
+Cause = EFR % 10;
+VPagenum = (EFR / 10) % 100;
+Ip_addr = (EFR/1000);
+
+if(Cause!=0) then
+	if(Cause == 1) then
+		print("Illegal Instruction");
+	endif;
+
+	if(Cause ==2) then
+		print("Illegal Memory");
+	endif;
+
+	if(Cause == 3) then
+		print("Division by zero");
+	endif;
+
+	if(Cause == 4) then
+		print("i.. operands");
+	endif;
+
+	alias physicalSP S0;
+	SP=SP+2;
+	physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+	[physicalSP -1]=10;
+	inline "JMP 11776";
+endif;
+
+if(Cause == 0) then
+	if([PTBR+VPagenum*2]==-1) then
+		print("INVALID ENTRY");
+		alias physicalSP S0;
+		SP=SP+2;
+		physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+		[physicalSP -1]=10;
+		inline "JMP 11776";
+	endif;
+	alias i S3;
+	alias pgnum S4;
+	alias found S5;
+	alias j S6;
+	i=0;
+	while(i<64) do
+		if([MEM_LIST+i]==0) then
+			[MEM_LIST+i]=1;
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	pgnum = i;
+breakpoint;
+	if(i==64) then
+		i=PTBR+VPagenum*2;
+		j=VPagenum;
+		found = 0;
+		while(found == 0) do
+			if((j+1)%4!=0) then
+				if([i+1]=="01") then
+					pgnum=[i];
+					if([MEM_LIST+pgnum] == 1) then
+						found=1;
+						pgnum=[i];
+						break;
+					endif;
+				endif;
+				if([i+1]=="11") then
+					[i+1]="01";
+				endif;
+			endif;
+			i=i+2;
+			j=j+1;
+			if(i>=1280) then
+				i=1024;
+				j=0;
+			endif;
+		endwhile;
+		j=448;
+		while(j<=511) do
+			if([DISK_LIST+j]==0) then
+				[DISK_LIST+j]=1;
+				store(pgnum,j);
+				[i]=j;
+				[i+1]="00";
+				store(6,20);
+				break;
+			endif;
+			j=j+1;
+		endwhile;
+		if(j>=512) then
+			print("NO SPACE");
+			alias physicalSP S0;
+			SP = SP+2;
+			physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+			[physicalSP -1]=10;
+			inline "JMP 11776";
+		endif;
+	endif;
+	if([PTBR+VPagenum*2]<=447) then
+		j=[PTBR+VPagenum*2];
+		load(pgnum,j);
+	else
+		j=[PTBR+VPagenum*2];
+		load(pgnum,j);
+		[DISK_LIST+j]=[DISK_LIST+j]-1;
+		store(6,20);
+	endif;
+	[PTBR+VPagenum*2] = pgnum;
+	[PTBR+VPagenum*2+1]="11";
+	SP=SP+1;
+	alias physicalSP S6;
+	physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+	[physicalSP] = Ip_addr;
+	ireturn;
+endif;

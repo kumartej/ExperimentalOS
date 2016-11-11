@@ -1,0 +1,92 @@
+//print ("IN INT4");
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+
+if(sysCallNo==5) then
+	alias arg1 S2;
+	arg1=[physicalSP - 4];
+	if(arg1<0 && arg1>7) then
+		print ("INVALID file");
+		[physicalSP - 2 ]=-1;
+		ireturn;
+	endif;
+	alias currentPID S3;
+	alias currentPCB S4;
+	currentPID = (PTBR-1024)/8;
+	currentPCB = READY_LIST + currentPID*32;
+	if([currentPCB + arg1*2 + 15]==-1) then
+		print ("invalid pentry");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias swftindex S5;
+	alias seek S6;
+	alias fatindex S7;
+	alias basicbloc S8;
+	alias db S9;
+	alias arg2 S10;
+	alias i S3;
+	swftindex=[currentPCB + arg1*2 + 15];
+	seek=[currentPCB + arg1*2 + 16];
+	fatindex=[FILE_TABLE+swftindex*2];
+	basicbloc = [FAT+fatindex*8+2];
+	load(1,basicbloc);
+	if(seek/512>=256) then
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	i=0;
+	while(i<256) do
+		if([SCRATCHPAD+i]==-1) then
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(i!=0) then
+		load(1,[SCRATCHPAD+i-1]);
+		db=i-1;
+		i=0;
+		while(i<512) do
+			if([SCRATCHPAD+i]=="") then
+				seek=db*512+i;
+				break;
+			endif;
+			i=i+1;
+		endwhile;
+		if(i==512) then
+			db=db+1;
+			seek=db*512;
+		endif;
+	endif;
+	load(1,basicbloc);
+	if([SCRATCHPAD+seek/512]==-1) then
+		i=20;
+		while (i<448) do
+			if([DISK_LIST + i]==0) then
+				break;
+			endif;
+			i=i+1;
+		endwhile;
+		if(i==448) then
+			print("No Space");
+			[physicalSP-2]=-1;
+			ireturn;
+		endif;
+		[DISK_LIST + i]=1;
+		[SCRATCHPAD+seek/512]=i;
+		[FAT+fatindex*8+1]=[FAT+fatindex*8+1]+512;
+		store(1,basicbloc);
+		store(5,19);
+		store(6,20);
+	endif;
+	db=[SCRATCHPAD+seek/512];
+	load(1,db);
+	arg2=[physicalSP-3];
+	[SCRATCHPAD + seek%512]=arg2;
+	store(1,db);
+	[currentPCB + arg1*2 + 16]=seek+1;
+	[physicalSP-2]=0;
+	ireturn;
+endif;

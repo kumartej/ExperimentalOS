@@ -1,0 +1,111 @@
+//print "IN INT2";
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+alias argument1 S2;
+argument1 = [physicalSP - 3];
+
+if(sysCallNo == 2) then
+	alias i S3;
+	i=0;
+	alias check S4;
+	check=0;
+	while(i<64) do
+		if([FAT + i*8] == argument1) then
+			check=1;
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(check==0) then
+		print "FILE Doesn't exist";
+		[physicalSP-2]=-1;
+		ireturn;
+	else
+		alias fatindex S5;
+		alias filetable S6;
+		fatindex=i;
+		i=0;
+		check=-1;
+		while(i<64) do
+			if([FILE_TABLE + i*2] == fatindex) then
+				break;
+			endif;
+			if(check==-1 && [FILE_TABLE + i*2]==-1) then
+				check=i;
+			endif;
+			i=i+1;
+		endwhile;
+		if(i==64) then
+			if(check == -1) then
+				print "File table full";
+				[physicalSP-2]=-1;
+				ireturn;
+			else
+				filetable=check;
+			endif;
+		else
+			filetable=i;
+		endif;
+		alias currentPID S7;
+		currentPID=(PTBR-12800)/10;
+		alias currentPCB S8;
+		currentPCB = READY_LIST +currentPID*32;
+		i=15;
+		while(i<31) do
+			if([currentPCB + i + 0]==-1) then
+				break;
+			endif;
+			i=i+2;
+		endwhile;
+		if(i==31) then
+			print "PERTABLE FULL";
+			[physicalSP-2]=-1;
+			ireturn;
+		else
+			[currentPCB + i + 0]=filetable;
+			[currentPCB + i + 1]=0;
+			if([FILE_TABLE+filetable*2]==-1) then
+				[FILE_TABLE+filetable*2]=fatindex;
+			endif;
+			[FILE_TABLE + filetable*2 +1]=[FILE_TABLE + filetable*2 +1]+1;
+			[physicalSP-2]=(i-15)/2;
+			ireturn;
+		endif;
+	endif;
+endif;
+
+if(sysCallNo ==3) then
+	if(argument1<0 || argument1>7) then
+		print ("invalid file");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias currentPID S3;
+	currentPID=(PTBR-12800)/10;
+	alias currentPCB S4;
+	currentPCB = READY_LIST +currentPID*32;
+	if([currentPCB+argument1*2 + 15]==-1) then
+		print ("invalid pentry");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias filetable S5;
+	filetable = [currentPCB+argument1*2 + 15];
+	if([FILE_TABLE + filetable*2]==-1) then
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	[FILE_TABLE + filetable*2 +1]=[FILE_TABLE + filetable*2 +1]-1;
+	if([FILE_TABLE + filetable*2 +1]==0) then
+		[FILE_TABLE + filetable*2]=-1;
+	endif;
+	[currentPCB+ argument1*2 +15]=-1;
+	[currentPCB+ argument1*2 +16]=-1;
+	[physicalSP-2]=0;
+	ireturn;
+endif;
+
+print "something wrong";
+ireturn;

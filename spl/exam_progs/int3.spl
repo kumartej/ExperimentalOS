@@ -1,0 +1,84 @@
+// print ("IN INT3");
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+
+if(sysCallNo==6) then
+	alias arg1 S2;
+	arg1=[physicalSP - 4];
+	if(arg1<0 && arg1>7) then
+		print ("INVALID file");
+		[physicalSP - 2 ]=-1;
+		ireturn;
+	endif;
+	alias currentPID S3;
+	alias currentPCB S4;
+	currentPID = (PTBR-12800)/10;
+	currentPCB = READY_LIST + currentPID*32;
+	if([currentPCB + arg1*2 + 15]==-1) then
+		print ("invalid pentry");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias swftindex S5;
+	alias fatindex S6;
+	alias arg2 S7;
+	alias fsize S8;
+	alias i S3;
+	swftindex=[currentPCB + arg1*2 + 15];
+	fatindex=[FILE_TABLE+swftindex*2];
+	fsize=[FAT+swftindex*8+1];
+	arg2=[physicalSP-3];
+	if(arg2<0 && arg2>=fsize) then
+		print("OUTBOUNDS");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	[currentPCB + arg1*2 + 16]=arg2;
+	[physicalSP-2]=0;
+	ireturn;
+endif;
+if(sysCallNo == 7) then
+	alias arg1 S2;
+	arg1=[physicalSP - 4];
+	if(arg1<0 && arg1>7) then
+		print ("INVALID file");
+		[physicalSP - 2 ]=-1;
+		ireturn;
+	endif;
+	alias currentPID S3;
+	alias currentPCB S4;
+	currentPID = (PTBR-12800)/10;
+	currentPCB = READY_LIST + currentPID*32;
+	if([currentPCB + arg1*2 + 15]==-1) then
+		print ("invalid pentry");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias swftindex S5;
+	alias seek S6;
+	alias fatindex S7;
+	alias basicbloc S8;
+	alias db S9;
+	alias arg2 S10;
+	alias i S3;
+	swftindex=[currentPCB + arg1*2 + 15];
+	seek=[currentPCB + arg1*2 + 16];
+	fatindex=[FILE_TABLE+swftindex*2];
+	basicbloc = [FAT+fatindex*8+2];
+	load(1,basicbloc);
+	i=[FAT+fatindex*8+1];
+	if(seek>=i) then
+		print("OUTBOUNDS");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	db=[SCRATCHPAD+seek/512];
+	load(1,db);
+	arg2=[SCRATCHPAD+seek%512];
+	[physicalSP-3]=arg2;
+	[currentPCB + arg1*2 + 16]=seek+1;
+	[physicalSP-2]=0;
+	ireturn;
+endif;

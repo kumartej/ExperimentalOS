@@ -1,0 +1,150 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+alias ppid S3;
+if(sysCallNo==10) then
+	alias i S2;
+	i=0;
+	alias pPCB S4;
+	ppid=(PTBR-1024)/8;
+	pPCB=READY_LIST+ppid*32;
+	breakpoint;
+	while(i<32) do
+		if([READY_LIST+i*32+1]==100+ppid) then
+			[READY_LIST+i*32+1]=1;
+		endif;
+		i=i+1;
+	endwhile;
+	i=0;
+	while(i<32) do
+		if([READY_LIST+i*32+1]==1) then
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(i==32) then
+		halt;
+	endif;
+	
+	i=15;
+	alias widentry S5;
+	alias tmp S6;
+	while(i<30) do
+		if([pPCB+i]!=-1) then
+			widentry=[pPCB+i];
+			tmp=[FILE_TABLE+widentry*2+1];
+			[FILE_TABLE+widentry*2+1]=tmp-1;
+			[pPCB+i]=-1;
+			[pPCB+i]=0;
+			if(tmp==0) then
+				[FILE_TABLE+widentry*2]=-1;
+			endif;
+		endif;
+		i=i+2;
+	endwhile;
+	[pPCB+1]=0;
+	i=0;
+	while(i<PTLR) do
+		if([PTBR+i*2]!=-1) then
+			tmp=[PTBR+i*2];
+			[MEM_LIST+tmp]=0;
+		endif;
+		[PTBR+i*2]=-1;
+		[PTBR+i*2+1]="00";
+		i=i+1;
+	endwhile;
+endif;
+
+if(sysCallNo==13) then
+	alias waitingPID S2;
+	waitingPID = [physicalSP-3];
+
+	ppid = (PTBR - 1024)/8;
+
+	if(ppid == waitingPID) then
+		print("SAME PID");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias waitingPCB S4;
+	waitingPCB = READY_LIST+ 32*waitingPID;
+	if([waitingPCB+1]==0) then
+		print("NO PROCESS");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias currentPCB S5;
+	currentPCB = READY_LIST+ 32*ppid;
+	[currentPCB+1] = 100+waitingPID;
+
+	[physicalSP-2] = 0;
+	[ currentPCB + 2 ] = BP;
+	[ currentPCB + 3 ] = SP - 1;
+	alias physicalSP S2;
+	physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+	[ currentPCB + 4 ] = [ physicalSP ];
+	[ currentPCB + 5 ] = PTBR;
+	[ currentPCB + 6 ] = PTLR;
+	[ currentPCB + 7 ] = R0;
+	[ currentPCB + 8 ] = R1;
+	[ currentPCB + 9 ] = R2;
+	[ currentPCB + 10 ] = R3;
+	[ currentPCB + 11 ] = R4;
+	[ currentPCB + 12 ] = R5;
+	[ currentPCB + 13 ] = R6;
+	[ currentPCB + 14 ] = R7;
+endif;
+
+if(sysCallNo==10 || sysCallNo==13) then
+	alias iterPID S7;
+	alias iterPCB S8;
+	iterPID=(ppid+1)%32;
+	iterPCB=READY_LIST + 32*iterPID;
+	while(iterPID!=ppid) do
+		if([iterPCB + 1] == 1) then
+			break;
+		endif;
+		iterPID=(iterPID+1)%32;
+		iterPCB=READY_LIST + 32*iterPID;
+	endwhile;
+	if(sysCallNo==13) then
+		if(iterPID == ppid) then
+			print("NO Waiting");
+			halt;
+		endif;
+	endif;
+	[iterPCB + 1]=2;
+	BP=[iterPCB + 2];
+	SP=[iterPCB + 3];
+	PTBR = [iterPCB + 5];
+	PTLR = [iterPCB + 6];
+	R0 = [iterPCB + 7];
+	R1 = [iterPCB + 8];
+	R2 = [iterPCB + 9];
+	R3 = [iterPCB + 10];
+	R4 = [iterPCB + 11];
+	R5 = [iterPCB + 12];
+	R6 = [iterPCB + 13];
+	R7 = [iterPCB + 14];
+	SP = SP + 1;
+	alias newphysicalSP S2;
+	newphysicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+	[ newphysicalSP ] = [ iterPCB + 4 ];
+	ireturn;
+endif;
+
+if(sysCallNo==14) then
+	alias i S2;
+	i=0;
+	alias ppid S3;
+	ppid=(PTBR-1024)/8;
+	while(i<32) do
+		if([READY_LIST+i*32+1]==100+ppid) then
+			[READY_LIST+i*32+1]=1;
+		endif;
+		i=i+1;
+	endwhile;
+	[physicalSP-2]=0;
+	ireturn;
+endif;

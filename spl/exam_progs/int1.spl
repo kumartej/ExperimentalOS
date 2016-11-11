@@ -1,0 +1,131 @@
+//print "IN INT1";
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+alias argument1 S2;
+argument1 = [physicalSP - 3];
+
+if(sysCallNo == 1) then
+	alias i S3;
+	alias check S4;
+	check=0;
+	i=0;
+	while( i<64 ) do
+		if( [FAT + i*8] == argument1) then
+			check=1;
+		endif;
+		i=i+1;
+	endwhile;
+	if(check==1) then
+		print "File Exists";
+		[physicalSP-2]=0;
+		ireturn;
+	else
+		i=20;
+		while (i<448) do
+			if([DISK_LIST + i]==0) then
+				break;
+			endif;
+			i=i+1;
+		endwhile;
+		if(i==448) then
+			print "No Free Space";
+			[physicalSP-2]=-1;
+			ireturn;
+		else
+			alias FatEntry S5;
+			FatEntry = 0;
+			while( FatEntry <64) do
+				if([FAT+ FatEntry*8]==-1) then
+					break;
+				endif;
+				FatEntry=FatEntry+1;
+			endwhile;
+			if(FatEntry==64) then
+				print "FatEntry NotAvail";
+				[physicalSP - 2]=-1;
+				ireturn;
+			endif;
+			[FAT + FatEntry*8]=argument1;
+			[FAT + 1+ FatEntry*8]=0;
+			[FAT + 2+ FatEntry*8]=i;
+			load(1,i);
+			alias j S6;
+			j=0;
+			while(j<512) do
+				[SCRATCHPAD +j]=-1;
+				j=j+1;
+			endwhile;
+			store(1,i);
+			[DISK_LIST + i]=1;
+			store(5,19);
+			store(6,20);
+		endif;
+	endif;
+	[physicalSP-2]=0;
+	ireturn;
+endif;
+if(sysCallNo == 4) then
+	alias i S3;
+	i=0;
+	while(i<64) do
+		if([FAT+i*8]==argument1) then
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(i==64) then
+		print ("file doesn't");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias fatindex S4;
+	fatindex=i;
+	i=0;
+	while(i<64) do
+		if([FILE_TABLE + i*2]==fatindex) then
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(i<64) then
+		print("file is opened");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias basicblock S5;
+	basicblock=[FAT+fatindex*8+2];
+	alias j S6;
+	alias db S7;
+	i=0;
+	while(i<256) do
+		load(1,basicblock);
+		db=[SCRATCHPAD+i];
+		if(db!=-1) then
+			load(1,db);
+			j=0;
+			while(j<512) do
+				[SCRATCHPAD+j]="";
+				j=j+1;
+			endwhile;
+			store(1,db);
+		endif;
+		i=i+1;
+	endwhile;
+	i=0;
+	load(1,basicblock);
+	while(i<512) do
+		[SCRATCHPAD+i]=-1;
+		i=i+1;
+	endwhile;
+	store(1,basicblock);
+	[DISK_LIST + basicblock]=0;
+	[FAT+fatindex*8]=-1;
+	[FAT+fatindex*8+1]=-1;
+	[FAT+fatindex*8+2]=-1;
+	store(5,19);
+	store(6,20);
+	[physicalSP-2]=0;
+	ireturn;
+endif;

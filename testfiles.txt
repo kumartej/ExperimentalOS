@@ -1,0 +1,42 @@
+rm --data a.dat
+rm --data b.dat
+rm --data c.dat
+rm --data d.dat
+rm --data m1.dat
+rm --data m2.dat
+rm --data m3.dat
+rm --data file2.dat
+
+load --init ../apl/apl_progs/final_stg10.xsm
+load --os ../spl/spl_progs/os_startup.xsm
+load --int=1 ../spl/spl_progs/int1.xsm
+load --int=2 ../spl/spl_progs/int2.xsm
+load --int=3 ../spl/spl_progs/int3.xsm
+load --int=4 ../spl/spl_progs/int4.xsm
+load --int=5 ../spl/spl_progs/int5.xsm
+load --int=6 ../spl/spl_progs/int6.xsm
+load --int=7 ../spl/spl_progs/int7.xsm
+load --exhandler ../spl/spl_progs/exhandler.xsm
+load --int=timer ../spl/spl_progs/timer.xsm
+
+rm --data 1.dat
+rm --data 2.dat
+rm --data 3.dat
+rm --data 4.dat
+rm --data 5.dat
+rm --data 6.dat
+rm --data 7.dat
+
+exam_progs
+
+load --init ../apl/exam_progs/final_stg10.xsm
+load --os ../spl/exam_progs/os_startup.xsm
+load --int=1 ../spl/exam_progs/int1.xsm
+load --int=2 ../spl/exam_progs/int2.xsm
+load --int=3 ../spl/exam_progs/int3.xsm
+load --int=4 ../spl/exam_progs/int4.xsm
+load --int=5 ../spl/exam_progs/int5.xsm
+load --int=6 ../spl/exam_progs/int6.xsm
+load --int=7 ../spl/exam_progs/int7.xsm
+load --exhandler ../spl/exam_progs/exhandler.xsm
+load --int=timer ../spl/exam_progs/timer.xsm

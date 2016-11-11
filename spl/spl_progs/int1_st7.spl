@@ -1,0 +1,77 @@
+print "IN INT1";
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+alias argument1 S2;
+argument1 = [physicalSP - 3];
+
+if(sysCallNo == 1) then
+	print argument1;
+	alias i S3;
+	alias check S4;
+	check=0;
+	i=0;
+	while( i<64 ) do
+		if( [FAT + i*8] == argument1) then
+			check=1;
+		endif;
+		i=i+1;
+	endwhile;
+	if(check==1) then
+		print "File Exists";
+		[physicalSP-2]=0;
+		ireturn;
+	else
+		print "File Doesnot Exist";
+		i=20;
+		while (i<448) do
+			if([DISK_LIST + i]==0) then
+				break;
+			endif;
+			i=i+1;
+		endwhile;
+		if(i==448) then
+			print "No Free Space";
+			[physicalSP-2]=-1;
+			ireturn;
+		else
+			print i;
+			alias FatEntry S5;
+			FatEntry = 0;
+			while( FatEntry <64) do
+				if([FAT+ FatEntry*8]==-1) then
+					break;
+				endif;
+				FatEntry=FatEntry+1;
+			endwhile;
+			if(FatEntry==64) then
+				print "FatEntry NotAvail";
+				[physicalSP - 2]=-1;
+				ireturn;
+			endif;
+			print "FatEntry avail";
+			[FAT + FatEntry*8]=argument1;
+			[FAT + 1+ FatEntry*8]=0;
+			[FAT + 2+ FatEntry*8]=i;
+			load(1,i);
+			alias j S6;
+			j=0;
+			while(j<512) do
+				[SCRATCHPAD +j]=-1;
+				print [SCRATCHPAD +j];
+				j=j+1;
+			endwhile;
+			store(1,i);
+			[DISK_LIST + i]=1;
+			store(5,19);
+			store(6,20);
+			print FatEntry;			
+		endif;
+	endif;
+endif;
+if(sysCallNo == 4) then
+	print "Will be updated soon";
+endif;
+[physicalSP-2]=0;
+ireturn;

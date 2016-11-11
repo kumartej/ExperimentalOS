@@ -1,0 +1,149 @@
+//print("INT5");
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP -1];
+
+if(sysCallNo == 8) then
+	alias i S2;
+	i=0;
+	while(i<32) do
+		if([READY_LIST+i*32+1]==0) then
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(i==32) then
+		print("NOPCBFREE");
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+	alias pcbindex S3;
+	pcbindex=i;
+	[READY_LIST+i*32]=i;
+	i=0;
+	while(i<64) do
+		if([MEM_LIST+i]==0) then
+			[MEM_LIST+i]=1;
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	alias pgnum S15;
+	alias j S5;
+	alias found S14;
+	pgnum = i;
+breakpoint;
+	if(i>=64) then
+		i=0;
+		found = 0;
+		while(found == 0) do
+			if((i+1)%4!=0) then
+				if([1024+i*2+1]=="01") then
+					pgnum=[1024+i*2];
+					if([MEM_LIST+pgnum]<=1) then
+						found=1;
+						pgnum=[1024+i*2];
+						break;
+					endif;
+				endif;
+				if([1024+i*2+1]=="11") then
+					[1024+i*2+1]="01";
+				endif;
+			endif;
+			i=(i+1)%128;
+		endwhile;
+//		print("YES");
+		j=448;
+		while(j<=511) do
+			if([DISK_LIST+j]==0) then
+				[DISK_LIST+j]=1;
+				store(pgnum,j);
+				[1024+i*2]=j;
+				[1024+i*2+1]="00";
+				store(6,20);
+				break;
+			endif;
+			j=j+1;
+		endwhile;
+		if(j>=512) then
+			print("NO SPACE");
+			[physicalSP-1]=10;
+			inline "JMP 11776";
+		endif;
+	endif;
+
+	alias childPTBR S4;
+	childPTBR = 1024+pcbindex*8;
+	[childPTBR + 6] = pgnum;
+	[childPTBR + 7] = "01";
+
+	alias pstk S4;
+	pstk = [PTBR+6];
+	j=0;
+	while(j<512) do
+		[pgnum*512+j]=[pstk*512+j];
+		j=j+1;
+	endwhile;
+
+	i=0;
+	j=0;
+	alias vpage S6;
+	alias k S7;
+	alias temp S8;
+	alias chptbr S9;
+	k=0;
+	chptbr=1024+pcbindex*8;
+
+	while(i<3) do
+		vpage = [PTBR+i*2];
+		[chptbr+i*2] = vpage;
+		[chptbr+i*2+1] = [PTBR+i*2+1];
+		if([PTBR+i*2+1]=="01" || [PTBR+i*2+1]=="11") then
+			[MEM_LIST+vpage]=[MEM_LIST+vpage]+1;
+		else
+			if([PTBR+i*2]>447) then
+				[DISK_LIST+vpage]=[DISK_LIST+vpage]+1;
+				store(6,20);
+			endif;
+		endif;
+		i=i+1;
+	endwhile;
+	
+	alias childPCB S10;
+	childPCB = READY_LIST+pcbindex*32;
+	[childPCB+5] = chptbr;
+	[childPCB+4] = [physicalSP];
+	[childPCB+3] = SP-1;
+	[childPCB+2] = BP;
+	[childPCB+7] = R0;
+	[childPCB+8] = R1;
+	[childPCB+9] = R2;
+	[childPCB+10] = R3;
+	[childPCB+11] = R4;
+	[childPCB+12] = R5;
+	[childPCB+13] = R6;
+	[childPCB+14] = R7;
+	[childPCB+6] = PTLR;
+	i=15;
+	alias ppid S6;
+	ppid = (PTBR-1024)/8;
+	[childPCB+31] = ppid;
+	alias parentPCB S7;
+	parentPCB = READY_LIST+ppid*32;
+	while(i<30) do
+		temp=[parentPCB+i];
+		if(temp!=-1) then
+			[FILE_TABLE+temp*2+1]=[FILE_TABLE+temp*2+1]+1;
+		endif;
+		[childPCB+i]=[parentPCB+i];
+		[childPCB+i+1]=[parentPCB+i+1];
+		i=i+2;
+	endwhile;
+	[childPCB+1]=1;
+	[physicalSP-2]=pcbindex;
+	alias chpSP S11;
+	chpSP = ([chptbr + 2 * ((SP-1) / 512)] * 512) + ((SP-1) % 512);
+	[chpSP-1]=-2;
+	ireturn;
+endif;
